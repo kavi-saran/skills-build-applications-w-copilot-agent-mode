@@ -28,22 +28,21 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 ## Implementation decisions
 
-Record your plan here before editing code.
-
-- Presentation tier decision:
-- Logic tier decision:
-- Data tier decision:
-- Activity tracking approach:
-- Team management approach:
-- Leaderboard approach:
-- Workout suggestions approach:
+- Presentation tier decision: Keep React components responsible for rendering and user interaction. Use the shared API client with relative `/api` paths, and expose accessible loading, success, empty, and error states for each capability. Do not put persistence or business rules in the browser.
+- Logic tier decision: Keep Express route handlers thin: parse requests, call service functions, and translate deliberate service errors into HTTP responses. Put validation and capability rules in the service layer; do not let routes access MongoDB models directly.
+- Data tier decision: Use Mongoose schemas to define required fields, references, defaults, and persistence. Keep seed data idempotent and preserve unrelated existing records. Do not add authentication in this exercise.
+- Activity tracking approach: Validate the request shape, positive minutes, and well-formed IDs, then confirm the referenced user and team exist before creating an activity. Store the references, type, minutes, computed points, and occurrence time; return deliberate 4xx responses for invalid or missing references.
+- Team management approach: Require a non-empty name and mascot, default members to an empty array, and retain the submitted name and mascot when creating and listing teams. Validate member references before associating them.
+- Leaderboard approach: Sum activity points by team, order totals from highest to lowest, and return each team name, total points, and a 1-based rank. Keep the aggregation in the service/data access path, not in presentation components.
+- Workout suggestions approach: Find the user by decoded email, use their fitness goal and recent activity to prioritize matching workouts, and return an explanatory reason with each suggestion. Return a deliberate 4xx response if no user matches.
 
 ## Test plan
 
-Record the commands you run and what each failure means.
+- Data tier: `npm run test:data --prefix octofit-tracker/backend` checks model validation and idempotent seeding. A failure in a required-field assertion points to a schema gap; a seed failure points to fixture creation, linking, preservation, or repeatability.
+- Logic/API tier: `npm run test:api --prefix octofit-tracker/backend` checks request validation, persistence, leaderboard ordering, and personalized workout suggestions. A `5xx` for invalid input indicates missing deliberate validation; wrong response data indicates a service rule or query problem.
+- Frontend: `npm test --prefix octofit-tracker/frontend` checks API requests and accessible loading, success, empty, and error states. A failure indicates a presentation/API contract mismatch.
+- Backend build: `npm run build --prefix octofit-tracker/backend` type-checks the Express, service, and model code; a failure indicates a TypeScript contract or implementation error.
+- Frontend build: `npm run build --prefix octofit-tracker/frontend` type-checks and bundles the Vite app; a failure indicates a frontend type or production-build issue.
+- Exercise validation: `node --test tests/exercise-validation.test.mjs` checks repository and learner-grading contracts. A failure identifies an exercise metadata, workflow-safety, or validation-rule mismatch.
 
-- Data-tier command: `npm run test:data --prefix octofit-tracker/backend`
-- API command: `npm run test:api --prefix octofit-tracker/backend`
-- Frontend command: `npm test --prefix octofit-tracker/frontend`
-- Backend build command: `npm run build --prefix octofit-tracker/backend`
-- Frontend build command: `npm run build --prefix octofit-tracker/frontend`
+Latest checks on `build-octofit-app`: the data suite has 4 failing model-validation tests and 1 passing idempotent-seed test; the API suite has 4 failures (activity/team creation return `501`, leaderboard is empty, and workout suggestions do not match the user's goal/activity). The frontend suite passes all 15 tests, and both frontend and backend builds pass. The exercise validator passes 36 of 40 tests; all four failures currently report the README Copy Exercise badge owner/name mismatch, which also prevents three fixture checks from reaching their intended assertion.
